@@ -1,0 +1,14 @@
+name: BayesFunc
+channels:
+  - conda-forge
+  - pytorch
+dependencies:
+  - pip
+  - six
+  - numpy
+  - matplotlib
+  - jupyter
+  - pytorch
+  - torchvision
+  - pip:
+    -e .
