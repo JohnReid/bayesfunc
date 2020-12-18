@@ -31,7 +31,7 @@ class KernelFeatures(Kernel):
         assert inducing_batch is not None
         self.inducing_batch = inducing_batch
         self.log_lengthscales = nn.Parameter(t.zeros(in_features))
-        self.log_height = nn.Parameter(t.zeros(()))
+        self.log_height = nn.Parameter(t.zeros(()))  # A log-variance parameter
 
     def d2s(self, x, y=None):
         if y is None:
