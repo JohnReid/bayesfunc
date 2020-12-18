@@ -11,6 +11,8 @@ import bayesfunc as bf
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import seaborn as sns
+from importlib import reload
+reload(bf)
 
 logging.basicConfig(level=logging.INFO)
 mpl.rcParams['backend']
@@ -36,16 +38,19 @@ def schur_complement(K, *dims):
     return t.diag(K.tt) - term2
 
 
-def train(net):
+def calculate_elbo(net, samples):
+    output, logpq, _ = bf.propagate(net, X.expand(samples, -1, -1))
+    ll = Normal(output, 3 / scale).log_prob(y).sum(-1).mean(-1)
+    assert ll.shape == (samples,)
+    assert logpq.shape == (samples,)
+    return ll + logpq / train_batch
+
+
+def train(net, samples=10):
     opt = t.optim.Adam(net.parameters(), lr=0.05)
-    samples = 10
     for i in range(2000):
         opt.zero_grad()
-        output, logpq, _ = bf.propagate(net, X.expand(samples, -1, -1))
-        ll = Normal(output, 3 / scale).log_prob(y).sum(-1).mean(-1)
-        assert ll.shape == (samples,)
-        assert logpq.shape == (samples,)
-        elbo = ll + logpq / train_batch
+        elbo = calculate_elbo(net, samples=samples)
         (-elbo.mean()).backward()
         opt.step()
 
@@ -210,10 +215,12 @@ feat2kernel = net[1][0]
 sqexp1 = net[1][1]
 iw_layer = net[1][2]
 sqexp2 = net[1][3]
+gp = net[1][4]
 list(feat2kernel.named_parameters())
 list(sqexp1.named_parameters())
 list(iw_layer.named_parameters())
 list(sqexp2.named_parameters())
+list(gp.named_parameters())
 
 # No learning going on for V?
 iw_layer.V.sum()
@@ -223,7 +230,7 @@ iw_layer.V.min()
 # Spy activations
 spies = [ActivationSpy() for _ in net[1]]
 hooks = [module.register_forward_hook(spy) for module, spy in zip(net[1], spies)]
-ys = net(X.expand(nsamples, X.shape[0], -1))
+ys = net(X.expand(100, X.shape[0], -1))
 list(map(type, map(attrgetter('activations'), spies)))
 
 # Plot Gram matrices
@@ -241,3 +248,6 @@ for i, ax_row in enumerate(axes):
 fig.show()
 
 plt.close(fig)
+
+elbo = calculate_elbo(net, samples=10)
+print(f'ELBO: {elbo.mean():.2g} +/- {elbo.std():.2g}')
