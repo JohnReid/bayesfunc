@@ -145,7 +145,7 @@ def propagate(f, input, sample_dict=None):
     """
     clear_sample(f)
     if sample_dict is not None:
-        set_sample(f, sample_dict)
+        set_sample_dict(f, sample_dict)
     output = f(input) 
     sample_dict = get_sample_dict(f)
     clear_sample(f)
@@ -167,6 +167,10 @@ class Bias(nn.Module):
 
     def forward(self, x):
         return x + self.bias
+
+class BiasFeature(nn.Module):
+    def forward(self, x):
+        return t.cat([x, t.ones(*x.shape[:2], 1, *x.shape[3:])], 2)
 
 class MultFeatures(nn.Module):
     def __init__(self, *shape):
