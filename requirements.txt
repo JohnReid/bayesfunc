@@ -1,3 +1,5 @@
 six
 torch
 numpy
+seaborn
+matplotlib
