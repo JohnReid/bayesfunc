@@ -204,57 +204,40 @@ net = net.to(device=device, dtype=dtype)
 train(net)
 plot(net)
 
-net
-
-nsamples = 100
-ys = net(X.expand(nsamples, X.shape[0], -1))
-mean_ys = ys.mean(0)
-std_ys = ys.std(0)
-type(ys)
-ys.shape
-
+# Examine network's parameters
 net
 feat2kernel = net[1][0]
 sqexp1 = net[1][1]
 iw_layer = net[1][2]
 sqexp2 = net[1][3]
-dir(sqexp1)
 list(feat2kernel.named_parameters())
 list(sqexp1.named_parameters())
 list(iw_layer.named_parameters())
 list(sqexp2.named_parameters())
 
-feat_to_kernel = net[1][0]
+# No learning going on for V?
+iw_layer.V.sum()
+iw_layer.V.max()
+iw_layer.V.min()
+
+# Spy activations
 spies = [ActivationSpy() for _ in net[1]]
 hooks = [module.register_forward_hook(spy) for module, spy in zip(net[1], spies)]
 ys = net(X.expand(nsamples, X.shape[0], -1))
-ys = net(X.expand(nsamples, X.shape[0], -1))
-K = spies[0].activations
 list(map(type, map(attrgetter('activations'), spies)))
 
-
+# Plot Gram matrices
 show_schur = False
-nrow, ncol = 3, len(spies) - 1
+nrow, ncol = 3, len(spies) - 1  # Last layer does not output Gram matrix
 fig, axes = plt.subplots(nrows=nrow, ncols=ncol, figsize=(12, 8))
 for i, ax_row in enumerate(axes):
     for j, ax in enumerate(ax_row):
         if show_schur:
-            sns.heatmap(schur_complement(spies[j].activations)[i].detach(), ax=ax, xticklabels=False, yticklabels=False)
+            gram = schur_complement(spies[j].activations)
         else:
-            sns.heatmap(spies[j].activations.ii[i].detach(), ax=ax, xticklabels=False, yticklabels=False)
+            gram = spies[j].activations.ii
+        sns.heatmap(gram[i].detach(), ax=ax, xticklabels=False, yticklabels=False)
 
 fig.show()
 
 plt.close(fig)
-
-type(X)
-X.reshape((-1, 1, 1)).shape
-X.shape
-X
-X.expand(10, -1, -1).shape
-iwlayer = net[1][2]
-dir(iwlayer)
-
-iwlayer.V.sum()
-iwlayer.V.max()
-iwlayer.V.min()
