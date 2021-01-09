@@ -115,14 +115,17 @@ def get_sample_dict(f):
             result[n] = m._sample
     return result
 
-def set_sample_dict(f, sample_dict):
+def set_sample_dict(f, sample_dict, detach=True):
     mod_dict = {n: m for (n, m) in f.named_modules()}
     for name, sample in sample_dict.items():
         mod = mod_dict[name]
         assert hasattr(mod, "_sample")
-        mod._sample = sample.detach()
+        if detach:
+            sample = sample.detach()
 
-def propagate(f, input, sample_dict=None):
+        mod._sample = sample
+
+def propagate(f, input, sample_dict=None, detach=True):
     """
     The ONLY way to run the neural networks defined in bayesfunc.  Replaces `f(input)`, which will now fail silently!
     
@@ -132,6 +135,7 @@ def propagate(f, input, sample_dict=None):
 
     keyword args:
         sample_dict: optional dictionary of sampled weights, to allow using the same weights for multiple different inputs
+        detach: if true, we detach parameters in sample_dict, stopping propagation of gradients
 
     outputs:
         - **output:** neural network output (as in ``output = f(input)``). 
@@ -145,7 +149,7 @@ def propagate(f, input, sample_dict=None):
     """
     clear_sample(f)
     if sample_dict is not None:
-        set_sample_dict(f, sample_dict)
+        set_sample_dict(f, sample_dict, detach=detach)
     output = f(input) 
     sample_dict = get_sample_dict(f)
     clear_sample(f)
@@ -170,7 +174,7 @@ class Bias(nn.Module):
 
 class BiasFeature(nn.Module):
     def forward(self, x):
-        return t.cat([x, t.ones(*x.shape[:2], 1, *x.shape[3:])], 2)
+        return t.cat([x, t.ones(*x.shape[:2], 1, *x.shape[3:], device=x.device, dtype=x.dtype)], 2)
 
 class MultFeatures(nn.Module):
     def __init__(self, *shape):
