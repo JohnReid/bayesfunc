@@ -6,6 +6,7 @@ import numpy as np
 from scipy import stats
 import seaborn as sb
 import matplotlib.pyplot as plt
+from matplotlib import cm
 from matplotlib import colors
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import balanced_accuracy_score
@@ -79,9 +80,11 @@ _logger.info('Have %d test data', X_test.shape[0])
 inducing_batch = 37
 net = nn.Sequential(
     bf.FeaturesToKernel(inducing_batch=inducing_batch),
-    bf.SqExpKernelGram(),
+    bf.ReluKernelGram(),
     bf.IWLayer(inducing_batch),
-    bf.SqExpKernelGram(),
+    bf.ReluKernelGram(),
+    bf.IWLayer(inducing_batch),
+    bf.ReluKernelGram(),
     bf.GIGP(out_features=nclasses, inducing_batch=inducing_batch)
 )
 net = bf.InducingWrapper(net, inducing_batch=inducing_batch, inducing_shape=(inducing_batch, X.shape[-1]))
@@ -112,31 +115,49 @@ _logger.info('SVM balanced accuracy: %f', balanced_accuracy_score(y_test_np, y_s
 
 # Register hooks to access activations
 activation = {}
-layer_keys = []
+hooks = {}
 for l, layer in enumerate(net[1]):
-    layer_key = f'{l}-{type(layer).__name__}'
-    layer.register_forward_hook(get_activation(layer_key))
-    layer_keys.append(layer_key)
+    hooks[l] = layer.register_forward_hook(get_activation(l))
 
 # Visualisations
+_logger.info('Visualising')
 with t.no_grad():
+
     # Forward pass
-    logit_pred = net(X_test.expand(1, -1, -1))
+    nsamples = 3
+    logit_pred = net(X_test.expand(nsamples, -1, -1))
     y_dist = Categorical(logits=logit_pred)
-    activation.keys()
-    activation['0-FeaturesToKernel'].ii
-    activation['1-SqExpKernelGram'].ii
-    activation['2-IWLayer'].ii
-    activation['3-SqExpKernelGram'].ii
+
+    # Inspect parameters
+    dir(net[1][2])
+    for param in net[1][2].named_parameters():
+        print(param)
+    net[1][2].V
+    net[1][2].log_diag
+    net[1][2].log_delta
+    net[1][2].log_gamma
+
+    # Gather data for plotting
+    subnet = net[1]
+    nlayers = len(subnet) - 1
+    nlayers
+    data = np.empty((nsamples, nlayers, inducing_batch, inducing_batch))
+    for sample in range(nsamples):
+        for layer in range(nlayers):
+            data[sample, layer] = activation[layer].ii.detach()[sample]
+    vmin = data.min()
+    vmax = data.max()
 
     # Plot
+    plt.close('all')
+    fig, axes = plt.subplots(nrows=nsamples, ncols=nlayers + 1, figsize=(nlayers * 6, nsamples * 6))
     cmap = plt.get_cmap('coolwarm')
-    divnorm = colors.TwoSlopeNorm(vcenter=0.)
-    heatmap_args = dict(cmap=cmap, norm=divnorm)
-
-    fig, axes = plt.subplots(nrows=1, ncols=4, figsize=(24, 6))
-    sb.heatmap(data=activation['0-FeaturesToKernel'].ii.detach()[0], ax=axes[0], **heatmap_args)
-    sb.heatmap(data=activation['1-SqExpKernelGram'].ii.detach()[0], ax=axes[1])
-    sb.heatmap(data=activation['2-IWLayer'].ii.detach()[0], ax=axes[2])
-    sb.heatmap(data=activation['3-SqExpKernelGram'].ii.detach()[0], ax=axes[3])
+    norm = colors.TwoSlopeNorm(vmin=vmin, vcenter=0., vmax=vmax)
+    axes.shape
+    for sample in range(nsamples):
+        _logger.info('Plotting sample %d', sample)
+        for layer in range(nlayers):
+            sb.heatmap(data=data[sample, layer], ax=axes[sample, layer], cmap=cmap, norm=norm, cbar=False)
+        axes[sample, -1].axis('off')
+    fig.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap), ax=axes[:, -1])
     fig.savefig('dkp-visualisation.png')
