@@ -1,5 +1,20 @@
 #!/usr/bin/env python
 
+
+"""
+Deep kernel process fit to the wine UCI data. Training and evaluation configuration from the paper:
+
+> We began by comparing the performance of our deep inverse Wishart process (DIWP) against infi-
+> nite Bayesian neural networks (known as the neural network Gaussian process or NNGP) and DGPs.
+> To ensure sensible comparisons against the NNGP, we used a ReLU kernel in all models (Cho &
+> Saul, 2009). For all models, we used three layers (two hidden layers and one output layer), with three
+> applications of the kernel. In each case, we used a learned bias and scale for each input feature, and
+> trained for 8000 gradient steps with the Adam optimizer with 100 inducing points, a learning rate of
+> 10 −2 for the first 4000 steps and 10 −3 for the final 4000 steps. For evaluation, we used 100 samples
+> from the final iteration of gradient descent, and for each training step we used 10 samples in the
+> smaller datasets (boston, concrete, energy, wine, yacht), and 1 sample in the larger datasets.
+"""
+
 import logging
 import numpy as np
 from scipy import stats
@@ -12,7 +27,7 @@ from sklearn.metrics import balanced_accuracy_score
 from sklearn.datasets import load_wine
 from sklearn.preprocessing import StandardScaler
 from sklearn import svm
-import torch as t
+import torch
 import torch.nn as nn
 from torch.distributions import Categorical
 import bayesfunc as bf
@@ -26,24 +41,49 @@ def get_activation(name):
 
 
 def calculate_elbo(net, samples):
+    ndata = X_train.shape[0]
     logits, logpq, _ = bf.propagate(net, X_train.expand(samples, -1, -1))
-    loglik = Categorical(logits=logits).log_prob(y_train).sum(-1)
-    assert loglik.shape == (samples,)
+    loglik = Categorical(logits=logits).log_prob(y_train)
+    elbo = loglik.sum(-1) + logpq / ndata
+
+    assert loglik.shape == (samples, ndata)
     assert logpq.shape == (samples,)
-    return loglik + logpq / X_train.shape[0]
+    assert elbo.shape == (samples,)
+
+    return elbo
 
 
-def train(net, samples=10):
-    opt = t.optim.Adam(net.parameters(), lr=0.05)
-    for i in range(2000):
-        opt.zero_grad()
-        elbo = calculate_elbo(net, samples=samples)
-        (-elbo.mean()).backward()
-        opt.step()
+def train(net, num_iterations, learning_rates, samples):
+    elbos = np.empty((sum(num_iterations), samples))
+    it = 0
+    for niter, learning_rate in zip(num_iterations, learning_rates):
+        _logger.info('Running %d iterations with learning rate %f', niter, learning_rate)
+        opt = torch.optim.Adam(net.parameters(), lr=learning_rate)
+        for _ in range(niter):
+            opt.zero_grad()
+            elbo = calculate_elbo(net, samples=samples)
+            assert elbo.shape == (samples,)
+            elbos[it] = elbo.detach().numpy()
+            mean_elbo = elbo.mean()
+            if not (it % log_update_iter):
+                _logger.info('Iteration: %d; mean ELBO: %.3f', it, mean_elbo)
+            (- mean_elbo).backward()  # Maximise ELBO
+            opt.step()
+            it += 1
+    return elbos
 
 
 logging.basicConfig(level=logging.INFO)
 _logger = logging.getLogger('dkp-wine')
+
+# Configuration
+learning_rates = 5e-2, 1e-2, 1e-3
+niterations = 1000, 4000, 4000  # number of iterations at each learning rate
+num_train_samples = 10  # Number of samples to use when training
+num_eval_samples = 100  # Number of samples to use for evaluation
+inducing_batch = 100  # Number of inducing points to learn
+inducing_batch = 37  # Number of inducing points to learn. TODO: ELBO appears to depend on inducing_batch
+log_update_iter = 20  # How often to log progress
 
 # Load data
 data = load_wine()
@@ -60,39 +100,52 @@ scaler.transform(X).mean(axis=0)
 scaler.transform(X).std(axis=0)
 
 # Train-test split
-dtype = t.float64
+dtype = torch.float64
 device = 'cpu'
 X_train_np, X_test_np, y_train_np, y_test_np = train_test_split(scaler.transform(X), y, test_size=0.4, random_state=0)
-X_train = t.from_numpy(X_train_np).to(dtype=dtype, device=device)
-X_test = t.from_numpy(X_test_np).to(dtype=dtype, device=device)
-y_train = t.from_numpy(y_train_np).to(dtype=int, device=device)
-y_test = t.from_numpy(y_test_np).to(dtype=int, device=device)
+X_train = torch.from_numpy(X_train_np).to(dtype=dtype, device=device)
+X_test = torch.from_numpy(X_test_np).to(dtype=dtype, device=device)
+y_train = torch.from_numpy(y_train_np).to(dtype=int, device=device)
+y_test = torch.from_numpy(y_test_np).to(dtype=int, device=device)
 _logger.info('Have %d training data', X_train.shape[0])
 _logger.info('Have %d test data', X_test.shape[0])
 
 # Define network
-inducing_batch = 37
-net = nn.Sequential(
+dkp = nn.Sequential(
     bf.FeaturesToKernel(inducing_batch=inducing_batch),
     bf.ReluKernelGram(),
     bf.IWLayer(inducing_batch),
     bf.ReluKernelGram(),
     bf.IWLayer(inducing_batch),
-    bf.ReluKernelGram(),
+    bf.ReluKernelGram())
+noninducing = nn.Sequential(
+    # bf.NormalLearnedScale(),  # Don't know which layer will learn a scale as paper suggests
+    # bf.BiasFeature(),
+    dkp,
     bf.GIGP(out_features=nclasses, inducing_batch=inducing_batch)
 )
-net = bf.InducingWrapper(net, inducing_batch=inducing_batch, inducing_shape=(inducing_batch, X.shape[-1]))
+net = bf.InducingWrapper(noninducing, inducing_batch=inducing_batch, inducing_shape=(inducing_batch, X.shape[-1]))
 net = net.to(device=device, dtype=dtype)
 
 _logger.info('Training')
 inducing_data_orig = net[0].inducing_data.detach().numpy().copy()
-train(net)
+elbos = train(net, niterations, learning_rates, num_train_samples)  # Target ELBO from paper is -1.16
 inducing_data_post = net[0].inducing_data.detach().numpy().copy()
 inducing_data_orig - inducing_data_post  # Check inducing points moved
 
+# Plot ELBOs during training
+mean_elbos = elbos.mean(axis=-1)
+best_elbo = mean_elbos.max()
+elbo_sd = np.std(mean_elbos[-100:])
+fig, (ax, ax_zoom) = plt.subplots(ncols=2)
+ax.plot(mean_elbos)
+ax_zoom.plot(np.arange(len(mean_elbos)), mean_elbos)
+ax_zoom.set_ylim(best_elbo - 30 * elbo_sd, best_elbo)
+fig.savefig('train-ELBOs.png')
+
 # Predict
-with t.no_grad():
-    logit_pred = net(X_test.expand(100, -1, -1))
+with torch.no_grad():
+    logit_pred = net(X_test.expand(num_eval_samples, -1, -1))
     y_dist = Categorical(logits=logit_pred)
     y_ll = y_dist.log_prob(y_test)
     y_ll.mean()
@@ -110,12 +163,12 @@ _logger.info('SVM balanced accuracy: %f', balanced_accuracy_score(y_test_np, y_s
 # Register hooks to access activations
 activation = {}
 hooks = {}
-for l, layer in enumerate(net[1]):
+for l, layer in enumerate(dkp):
     hooks[l] = layer.register_forward_hook(get_activation(l))
 
 # Visualisations
 _logger.info('Visualising')
-with t.no_grad():
+with torch.no_grad():
 
     # Forward pass
     nsamples = 3
@@ -123,22 +176,17 @@ with t.no_grad():
     y_dist = Categorical(logits=logit_pred)
 
     # Inspect parameters
-    dir(net[1][2])
-    for param in net[1][2].named_parameters():
+    dir(dkp[2])
+    for param in dkp[2].named_parameters():
         print(param)
-    net[1][2].V
-    net[1][2].log_diag
-    net[1][2].log_delta
-    net[1][2].log_gamma
 
     # Gather data for plotting
-    subnet = net[1]
-    nlayers = len(subnet) - 1
+    nlayers = len(dkp)
     nlayers
     data = np.empty((nsamples, nlayers, inducing_batch, inducing_batch))
     for sample in range(nsamples):
         for layer in range(nlayers):
-            data[sample, layer] = activation[layer].ii.detach()[sample]
+            data[sample, layer] = activation[layer + 1].ii.detach()[sample]
     vmin = data.min()
     vmax = data.max()
 
