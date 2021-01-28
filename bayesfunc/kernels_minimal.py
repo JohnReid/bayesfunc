@@ -2,9 +2,10 @@ import random
 import math
 import torch as t
 import torch.nn as nn
+import pytorch_lightning as pl
 from .general import KG
 
-class Kernel(nn.Module):
+class Kernel(pl.LightningModule):
     """
     Abstract kernel class.  Could take KG or features as input.  Must have ``self.distances`` overwritten.
     """
@@ -53,11 +54,11 @@ class KernelFeatures(Kernel):
         d2tt = t.zeros(xt.shape[:-1], **kwargs)
         return (d2ii, d2it, d2tt)
 
-class IdentityKernel(nn.Module):
+class IdentityKernel(pl.LightningModule):
     def forward(self, kg):
         return kg
 
-class CombinedKernel(nn.Module):
+class CombinedKernel(pl.LightningModule):
     def __init__(self, *ks):
         super().__init__()
         self.ks = nn.ModuleList(ks)
@@ -121,7 +122,7 @@ class SqExpKernel(KernelFeatures):
     def kernel(self, d2):
         return t.exp(-0.5*d2)
 
-class ReluKernelGram(nn.Module):
+class ReluKernelGram(pl.LightningModule):
     """
     Relu  kernel from Gram matrix.
 
@@ -173,7 +174,7 @@ def ReluKernelFeatures(inducing_batch):
     """
     return nn.Sequential(FeaturesToKernel(inducing_batch), ReluKernelGram())
 
-class FeaturesToKernel(nn.Module):
+class FeaturesToKernel(pl.LightningModule):
     """
     Converts features to the corresponding Gram matrix.
 
@@ -209,7 +210,7 @@ class FeaturesToKernel(nn.Module):
         
 
 
-#class DistanceKernel(nn.Module):
+#class DistanceKernel(pl.LightningModule):
 #    def __init__(self, noise, inducing_batch):
 #        super().__init__()
 #        assert inducing_batch is not None

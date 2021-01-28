@@ -1,4 +1,5 @@
 import torch.nn as nn
+import pytorch_lightning as pl
 from torch.distributions import Normal, Gamma
 from torch.distributions.utils import broadcast_all
 import math
@@ -72,7 +73,7 @@ class InverseWishart:
 
         return res
 
-class IWLayer(nn.Module):
+class IWLayer(pl.LightningModule):
     """
     Inverse Wishart layer from a deep kernel process.  Takes a KG as input, and returns KG as output.
     

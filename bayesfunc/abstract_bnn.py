@@ -1,10 +1,11 @@
 import torch as t
 import torch.nn as nn
+import pytorch_lightning as pl
 from .bconv2d import bconv2d
 from .transforms import Identity
 
 
-class AbstractLinear(nn.Module):
+class AbstractLinear(pl.LightningModule):
     def __init__(self, in_features, out_features, bias=True, **kwargs):
         super().__init__()
 
@@ -32,7 +33,7 @@ class AbstractLinear(nn.Module):
 
 
 
-class AbstractConv2d(nn.Module):
+class AbstractConv2d(pl.LightningModule):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, **kwargs):
         super().__init__()
         self.in_channels = in_channels

@@ -1,14 +1,15 @@
 import torch as t
 import torch.nn as nn
+import pytorch_lightning as pl
 
-class Identity(nn.Module):
+class Identity(pl.LightningModule):
     def __init__(self, kernel_size):
         super().__init__()
 
     def forward(self, x):
         return x
 
-class ConvTransform(nn.Module):
+class ConvTransform(pl.LightningModule):
 #    Alternative, more memory efficient implementation that we can't use because of a pytorch bug
 #    def forward(self, x):
 #        shape = x.shape

@@ -2,6 +2,7 @@ import math
 import torch as t
 import torch.distributions as td
 import torch.nn as nn
+import pytorch_lightning as pl
 from .prob_prog import VI_Scale, VI_Normal
 from .outputs import CutOutput
 
@@ -19,7 +20,7 @@ class KG():
         self.it = it
         self.tt = tt
 
-class InducingAdd(nn.Module):
+class InducingAdd(pl.LightningModule):
     def __init__(self, inducing_batch, inducing_data=None, inducing_shape=None, fixed=False):
         super().__init__()
         assert (inducing_data is not None) != (inducing_shape is not None)
@@ -44,7 +45,7 @@ class InducingAdd(nn.Module):
          
         return x
 
-class InducingRemove(nn.Module):
+class InducingRemove(pl.LightningModule):
     def __init__(self, inducing_batch):
         super().__init__()
         self.inducing_batch = inducing_batch
@@ -57,7 +58,7 @@ def InducingWrapper(net, inducing_batch, *args, **kwargs):
     Combines incoming test/train data with learned inducing inputs, then strips away the inducing outputs, just leaving the function approximated at inducing locations. 
 
     args:
-        net (nn.Module): The underlying function approximator, represented as PyTorch modules, to be wrapped.
+        net (pl.LightningModule): The underlying function approximator, represented as PyTorch modules, to be wrapped.
         inducing_batch (int): The underlying function approximator, represented as PyTorch modules, to be wrapped.
 
     Keyword Args:
@@ -156,7 +157,7 @@ def propagate(f, input, sample_dict=None, detach=True):
     return output, logpq(f), sample_dict
 
     
-class NormalLearnedScale(nn.Module):
+class NormalLearnedScale(pl.LightningModule):
     def __init__(self):
         super().__init__()
         self.log_scale = nn.Parameter(t.zeros(()))
@@ -164,7 +165,7 @@ class NormalLearnedScale(nn.Module):
     def forward(self, x):
         return td.Normal(x, self.log_scale.exp())
 
-class Bias(nn.Module):
+class Bias(pl.LightningModule):
     def __init__(self, in_features):
         super().__init__()
         self.bias = nn.Parameter(t.zeros(in_features))
@@ -172,11 +173,11 @@ class Bias(nn.Module):
     def forward(self, x):
         return x + self.bias
 
-class BiasFeature(nn.Module):
+class BiasFeature(pl.LightningModule):
     def forward(self, x):
         return t.cat([x, t.ones(*x.shape[:2], 1, *x.shape[3:], device=x.device, dtype=x.dtype)], 2)
 
-class MultFeatures(nn.Module):
+class MultFeatures(pl.LightningModule):
     def __init__(self, *shape):
         super().__init__()
         self.log_scale = nn.Parameter(t.zeros(t.Size([*shape])))
@@ -184,7 +185,7 @@ class MultFeatures(nn.Module):
     def forward(self, x):
         return x * self.log_scale.exp()
 
-class MultKernel(nn.Module):
+class MultKernel(pl.LightningModule):
     def __init__(self):
         super().__init__()
         self.log_scale = nn.Parameter(t.zeros(()))
@@ -194,7 +195,7 @@ class MultKernel(nn.Module):
         return KG(k.ii*scale, k.it*scale, k.tt*scale)
 
 
-#class Wrapper(nn.Module):
+#class Wrapper(pl.LightningModule):
 #    def __init__(self, net, out=CutOutput(), init=None, in_dim=None, out_dim=None, parallel=True, device_ids=None):
 #        #Note: CutOutput is stateless, so okay if same object shared across wrapped networks
 #        super().__init__()
@@ -232,7 +233,7 @@ class MultKernel(nn.Module):
 
 
 
-class Reduce(nn.Module):
+class Reduce(pl.LightningModule):
     def __init__(self, *args):
         super().__init__()
         for idx, module in enumerate(args):
@@ -258,7 +259,7 @@ class Sum(Reduce):
         return sum(xs)
 
 
-class WrapMod(nn.Module):
+class WrapMod(pl.LightningModule):
     """
     Wraps an underlying PyTorch module, which can (but should not) contain parameters.
     """
@@ -292,7 +293,7 @@ class WrapMod2d(WrapMod):
         return x
 
 
-class AbstractBatchNorm2d(nn.Module):
+class AbstractBatchNorm2d(pl.LightningModule):
 
     def moments(self, x):
         #Average over spatial dims and batch, but not S
@@ -365,7 +366,7 @@ class AvgPool2d(WrapMod2d):
 
 
 
-class _Conv2d_2_FC(nn.Module):
+class _Conv2d_2_FC(pl.LightningModule):
     def forward(self, x):
         return x.view(*x.shape[:-3], -1)
 
@@ -374,7 +375,7 @@ class Conv2d_2_FC(WrapMod):
     Mod = _Conv2d_2_FC
 
 
-class Print(nn.Module):
+class Print(pl.LightningModule):
     def forward(self, x):
         print(x.shape)
         return x

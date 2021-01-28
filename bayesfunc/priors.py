@@ -1,11 +1,12 @@
 # Note we use 'InsanePrior' to refer to 'StandardPrior' in the code
 import torch as t
 import torch.nn as nn
+import pytorch_lightning as pl
 from .lop import Identity, Scale, KFac
 from .prob_prog import VI_InverseWishart, VI_Scale
 
 
-class FactorisedPrior(nn.Module):
+class FactorisedPrior(pl.LightningModule):
     def __init__(self, in_shape):
         super().__init__()
         #param only here to capture device and dtype
@@ -29,7 +30,7 @@ class InsanePrior(FactorisedPrior):
         return Identity(self.in_features, **self.dd_kwargs())
 
 
-class ScalePrior(nn.Module):
+class ScalePrior(pl.LightningModule):
     def __init__(self, in_shape, shape=2.):
         super().__init__()
         self.in_features = in_shape.numel()
@@ -53,7 +54,7 @@ class DetScalePrior(FactorisedPrior):
         return Scale(self.in_features, self.in_features*t.exp(self.param), **self.dd_kwargs)
 
 
-class IWPrior(nn.Module):
+class IWPrior(pl.LightningModule):
     """
     Inverse Wishart prior, treating all dimensions equally
     """
@@ -75,7 +76,7 @@ class IWPrior(nn.Module):
         return L
 
 
-class SpatialIWPrior(nn.Module):
+class SpatialIWPrior(pl.LightningModule):
     """
     Inverse Wishart prior, only over spatial dimensions.
     """
@@ -96,7 +97,7 @@ class SpatialIWPrior(nn.Module):
         return prec
 
 
-class KFacIWPrior(nn.Module):
+class KFacIWPrior(pl.LightningModule):
     """
     Inverse Wishart prior, only over spatial dimensions.
     """

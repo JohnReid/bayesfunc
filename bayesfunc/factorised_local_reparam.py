@@ -3,6 +3,7 @@
 import math
 import torch as t
 import torch.nn as nn
+import pytorch_lightning as pl
 from torch.distributions import Normal
 
 from .abstract_bnn import AbstractConv2d
@@ -22,7 +23,7 @@ Can configure:
 """
 
 
-class AbstractLRLinear(nn.Module):
+class AbstractLRLinear(pl.LightningModule):
     def __init__(self, in_features, out_features, bias=True, transform_inputs=Identity, transform_weights=Identity, **kwargs):
         super().__init__()
         self.inducing_batch = 0
@@ -54,7 +55,7 @@ class AbstractLRLinear(nn.Module):
     #     return self.forward(init)[0]
 
 
-class FactorisedParam(nn.Module):
+class FactorisedParam(pl.LightningModule):
     def __init__(self, in_shape, out_features, prior=NealPrior, var_fixed=None, var_init_mult=1E-3, mean_init_mult=1.,
                  log_var_lr=1., **kwargs):
         super().__init__()
@@ -92,7 +93,7 @@ class FactorisedParam(nn.Module):
         return w
 
 
-class FactorisedLRParam(nn.Module):
+class FactorisedLRParam(pl.LightningModule):
     def __init__(self, in_shape, out_features, prior=NealPrior, var_fixed=None, var_init_mult=1E-3, log_var_lr=1., mean_init_mult=1., **kwargs):
         super().__init__()
 

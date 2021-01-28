@@ -2,6 +2,7 @@ import math
 from .lop import PositiveDefiniteMatrix
 import torch as t
 import torch.nn as nn
+import pytorch_lightning as pl
 from torch.distributions import Normal, Gamma
 from .wishart_dist import InverseWishart
 
@@ -26,7 +27,7 @@ Note that all of these classes will sum out all but the first dimension, which i
 """
 
 
-class VI_Scalar(nn.Module):
+class VI_Scalar(pl.LightningModule):
     def forward(self, S, *args):
         #check all input args have same rank
         sample_shape = t.Size([S])
@@ -91,7 +92,7 @@ class VI_Gamma(VI_Scalar):
         return Gamma(shape, rate), Gamma(post_shape, post_rate)
 
 
-class VI_Scale(nn.Module):
+class VI_Scale(pl.LightningModule):
     """
     A scale,
     scale**2=1/prec => scale=sqrt(1/prec)
@@ -107,7 +108,7 @@ class VI_Scale(nn.Module):
         return t.rsqrt(x)
 
 
-class VI_InverseWishart(nn.Module):
+class VI_InverseWishart(pl.LightningModule):
     def __init__(self, p):
         super().__init__()
         self.p = p
@@ -144,7 +145,7 @@ class VI_InverseWishart(nn.Module):
         return x
 
 
-#class VI_InverseWishart_old(nn.Module):
+#class VI_InverseWishart_old(pl.LightningModule):
 #    def __init__(self, p):
 #        super().__init__()
 #        self.p = p

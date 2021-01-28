@@ -1,6 +1,7 @@
 import math
 import torch as t
 import torch.nn as nn
+import pytorch_lightning as pl
 from torch.distributions import Normal
 from .abstract_bnn import AbstractLinear, AbstractConv2d
 from .priors import NealPrior
@@ -18,7 +19,7 @@ Can configure:
 """
 
 
-class FactorisedParam(nn.Module):
+class FactorisedParam(pl.LightningModule):
     def __init__(self, in_shape, out_features, prior=NealPrior, var_fixed=None, var_init_mult=1E-3, mean_init_mult=1.,
                  log_var_lr=1., **kwargs):
         super().__init__()

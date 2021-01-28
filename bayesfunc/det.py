@@ -1,6 +1,7 @@
 import math
 import torch as t
 import torch.nn as nn
+import pytorch_lightning as pl
 from torch.distributions import Normal
 from .abstract_bnn import AbstractLinear, AbstractConv2d
 
@@ -16,7 +17,7 @@ Can configure:
 """
 
 
-class DetParam(nn.Module):
+class DetParam(pl.LightningModule):
     def __init__(self, in_features, out_features, unit_std=True, **kwargs):
         super().__init__()
         self.in_features = in_features

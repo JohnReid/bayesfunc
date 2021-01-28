@@ -1,5 +1,6 @@
 import torch as t
 import torch.nn as nn
+import pytorch_lightning as pl
 from .conv_mm import conv_mm
 from .abstract_bnn import AbstractLinear, AbstractConv2d
 from .lop import mvnormal_log_prob_unnorm
@@ -57,7 +58,7 @@ def rsample_logpq_weights_fc(self, Xi, neuron_prec):
     return rsample_logpq_weights(self, XiLXi, XiLY, self.prior, neuron_prec=neuron_prec)
 
 
-class GILinearWeights(nn.Module):
+class GILinearWeights(pl.LightningModule):
     def __init__(self, in_features, out_features, prior=NealPrior, bias=True, inducing_targets=None, log_prec_init=-4., log_prec_lr=1., neuron_prec=False, inducing_batch=None, full_prec=False):
         super().__init__()
         assert inducing_batch is not None
@@ -94,7 +95,7 @@ class GILinearWeights(nn.Module):
         return rsample_logpq_weights_fc(self, Xi.unsqueeze(1), neuron_prec=True)
 
 
-class LILinearWeights(nn.Module):
+class LILinearWeights(pl.LightningModule):
     def __init__(self, in_features, out_features, prior=NealPrior, bias=True, log_prec_init=-4., log_prec_lr=1., neuron_prec=False, full_prec=False):
         super().__init__()
         self.in_features = in_features
@@ -129,7 +130,7 @@ class LILinearWeights(nn.Module):
         return rsample_logpq_weights_fc(self, Xi, neuron_prec=True)
 
 
-class GIConv2dWeights(nn.Module):
+class GIConv2dWeights(pl.LightningModule):
     def __init__(self, in_channels, out_channels, kernel_size, prior=NealPrior, stride=1, padding=0, inducing_targets=None, log_prec_init=-4., log_prec_lr=1., neuron_prec=False, inducing_batch=None):
         super().__init__()
         assert inducing_batch is not None
@@ -174,7 +175,7 @@ class GIConv2dWeights(nn.Module):
         return rsample_logpq_weights(self, XiLXi, XiLY, self.prior, neuron_prec=True)
 
 
-class LIConv2dWeights(nn.Module):
+class LIConv2dWeights(pl.LightningModule):
     def __init__(self, in_channels, out_channels, kernel_size, prior=NealPrior, stride=1, padding=0, log_prec_init=-4., log_prec_lr=1., neuron_prec=False, full_prec=False):
         super().__init__()
         assert 1==kernel_size%2

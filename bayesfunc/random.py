@@ -2,6 +2,7 @@
 import math
 import torch as t
 import torch.nn as nn
+import pytorch_lightning as pl
 from .abstract_bnn import AbstractLinear, AbstractConv2d
 
 """
@@ -16,7 +17,7 @@ Can configure:
 """
 
 
-class RandomParam(nn.Module):
+class RandomParam(pl.LightningModule):
     def __init__(self, in_shape, out_features, **kwargs):
         super().__init__()
         self.in_shape = in_shape

@@ -1,8 +1,9 @@
 import torch.nn as nn
+import pytorch_lightning as pl
 from torch.distributions import Normal, Categorical
 
 
-class Output(nn.Module):
+class Output(pl.LightningModule):
     def inducing_init(self, inducing_batch):
         self.inducing_batch = inducing_batch
 

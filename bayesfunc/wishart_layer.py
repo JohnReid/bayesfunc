@@ -1,10 +1,11 @@
 import math
 import torch as t
 import torch.nn as nn
+import pytorch_lightning as pl
 from .wishart_dist import InverseWishart
 
 
-class IWLinear(nn.Module):
+class IWLinear(pl.LightningModule):
     def __init__(self, nu, post_data_features=None):
         super().__init__()
         self.prior_log_nu = math.log(nu)

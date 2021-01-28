@@ -2,6 +2,7 @@ from .general import InducingAdd, InducingRemove
 from .kernels_minimal import SqExpKernel as DefaultKernel
 import torch as t
 import torch.nn as nn
+import pytorch_lightning as pl
 from torch.distributions import Normal
 
 # posterior precision (L + K^{-1})
@@ -12,7 +13,7 @@ from torch.distributions import Normal
 
 from .lop import PositiveDefiniteMatrix, Inv, mvnormal_log_prob
 
-class GIGP(nn.Module):
+class GIGP(pl.LightningModule):
     """
     Global inducing point Gaussian process.  Takes KG as input and returns features.
 
